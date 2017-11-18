@@ -1,6 +1,7 @@
 """TestSuite"""
 
 import sys
+import fnmatch
 
 from . import case
 from . import util
@@ -265,6 +266,27 @@ class TestSuite(BaseTestSuite):
                 self._addClassOrModuleLevelException(result, e, errorName)
             finally:
                 _call_if_exists(result, '_restoreStdout')
+
+
+class SelectTestSuite(TestSuite):
+    def __init__(self, tests=(), select_patterns=()):
+        self.patterns = [p if '*' in p else '*%s*' % p for p in select_patterns]
+        super().__init__(tests)
+
+    def addTest(self, test):
+        if self.patterns is not None:
+            try:
+                test_id = test.id()
+            except:
+                pass
+            else:
+                if not any(fnmatch.fnmatchcase(test_id, p) for p in self.patterns):
+                    setattr(test, test._testMethodName, case.skip(self._skip_reason)(getattr(test, test._testMethodName)))
+        super().addTest(test)
+
+    @property
+    def _skip_reason(self):
+        return "Deselected (doesn't match pattern(s) %s)" % ', '.join(self.patterns)
 
 
 class _ErrorHolder(object):
